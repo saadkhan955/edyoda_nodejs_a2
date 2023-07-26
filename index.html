@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>WebSocket Chatroom</title>
+  <style>
+    .online { color: green; }
+    .offline { color: red; }
+  </style>
+</head>
+<body>
+  <div>
+    <input type="text" id="username" placeholder="Enter your name">
+    <input type="text" id="specialKey" placeholder="Enter the special key">
+    <button onclick="joinChat()">Join Chat</button>
+    <button onclick="disconnect()">Disconnect</button>
+  </div>
+  <div id="onlineUsersList">
+    <h2>Online Users</h2>
+    <div id="onlineUsers"></div>
+  </div>
+  <div id="disconnectedUsersList">
+    <h2>Disconnected Users</h2>
+    <div id="disconnectedUsers"></div>
+  </div>
+  <div id="chatBox"></div>
+  <div>
+    <input type="text" id="message" placeholder="Type your message">
+    <button onclick="sendMessage()">Send</button>
+  </div>
+
+  <script>
+    // Check if the WebSocket connection is already open
+    let socket;
+    if (!socket || socket.readyState !== WebSocket.OPEN) {
+      socket = new WebSocket('ws://localhost:8080');
+
+      socket.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+
+        if (data.type === 'onlineUsers') {
+          showOnlineUsers(data.users);
+        } else if (data.type === 'message') {
+          showMessage(data.sender, data.content);
+        } else if (data.type === 'error') {
+          alert(data.message);
+        } else if (data.type === 'disconnect') {
+          handleUserDisconnect(data.user);
+        }
+      };
+    }
+
+    let isConnected = false;
+
+    function joinChat() {
+      const username = document.getElementById('username').value;
+      const specialKey = document.getElementById('specialKey').value;
+
+      if (!username || !specialKey) {
+        alert('Please enter your name and the special key before joining.');
+        return;
+      }
+
+      const joinData = {
+        type: 'join',
+        name: username,
+        specialKey: specialKey,
+      };
+      socket.send(JSON.stringify(joinData));
+      isConnected = true;
+    }
+
+    function disconnect() {
+      if (!isConnected) {
+        alert('You are not connected to the chatroom.');
+        return;
+      }
+
+      const username = document.getElementById('username').value;
+      const disconnectData = {
+        type: 'disconnect',
+        name: username,
+      };
+      socket.send(JSON.stringify(disconnectData));
+      isConnected = false;
+    }
+
+    function sendMessage() {
+      if (!isConnected) {
+        alert('You are not connected to the chatroom. Please join first.');
+        return;
+      }
+
+      const message = document.getElementById('message').value;
+      const sender = document.getElementById('username').value;
+      const messageData = {
+        type: 'message',
+        sender,
+        content: message,
+      };
+      socket.send(JSON.stringify(messageData));
+    }
+
+    function showOnlineUsers(users) {
+      const onlineUsersDiv = document.getElementById('onlineUsers');
+      const disconnectedUsersDiv = document.getElementById('disconnectedUsers');
+      onlineUsersDiv.innerHTML = '';
+      disconnectedUsersDiv.innerHTML = '';
+
+      users.forEach((user) => {
+        const userDiv = document.createElement('div');
+        userDiv.textContent = user;
+        userDiv.dataset.user = user;
+        userDiv.className = 'online';
+        onlineUsersDiv.appendChild(userDiv);
+      });
+    }
+
+    function showMessage(sender, content) {
+      const chatBox = document.getElementById('chatBox');
+      const messageDiv = document.createElement('div');
+      messageDiv.textContent = `${sender}: ${content}`;
+      chatBox.appendChild(messageDiv);
+    }
+
+    function handleUserDisconnect(disconnectedUser) {
+      const onlineUsersDiv = document.getElementById('onlineUsers');
+      const disconnectedUsersDiv = document.getElementById('disconnectedUsers');
+      const userDiv = onlineUsersDiv.querySelector(`div[data-user="${disconnectedUser}"]`);
+
+      if (userDiv) {
+        onlineUsersDiv.removeChild(userDiv);
+        userDiv.classList.remove('online');
+        userDiv.classList.add('offline');
+        disconnectedUsersDiv.appendChild(userDiv);
+      }
+    }
+  </script>
+</body>
+</html>
